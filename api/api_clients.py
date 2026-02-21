@@ -10,7 +10,7 @@ class EnsemblClient:
             response = requests.get(f"{self.base_url}{endpoint}", headers=headers, timeout=15)
             if response.status_code == 200:
                 return response
-            elif response.status_code == 428:
+            elif response.status_code == 429:
                 retry_after = int(response.headers.get("Retry-After", 1))
                 time.sleep(retry_after)
                 return self._handle_request(endpoint, headers)
@@ -18,10 +18,14 @@ class EnsemblClient:
         except:
             return None
 
-    def get_sequence_by_id(self, ensembl_id):
+    def get_sequence_by_id(self, ensembl_id, chunk_size=None):
         headers = {"Content-Type": "text/plain"}
         res = self._handle_request(f"/sequence/id/{ensembl_id}", headers)
-        return res.text if res else None
+        
+        if res:
+            sequence = res.text
+            return sequence[:chunk_size] if chunk_size else sequence
+        return None
 
     def get_gene_info(self, ensembl_id):
         headers = {"Content-Type": "application/json"}
