@@ -27,7 +27,7 @@ original_dna = ens.get_sequence_by_id(ensembl_id, chunk_size=600)
     
 print(f"\nBIOGRAPHY SENSITIVITY TEST: {gene_symbol}")
 print("="*40)
-
+    
 if original_dna:
     list_dna = list(original_dna)
     list_dna[300] = 'A' if list_dna[300] != 'A' else 'C'

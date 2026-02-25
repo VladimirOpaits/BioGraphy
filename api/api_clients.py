@@ -19,13 +19,30 @@ class EnsemblClient:
             return None
 
     def get_sequence_by_id(self, ensembl_id, chunk_size=None):
+        lookup_endpoint = f"/lookup/id/{ensembl_id}?"       
+        gene_info_res = self._handle_request(lookup_endpoint, {"Content-Type": "application/json"})
+        if not gene_info_res:
+            return None       # metadata
+
+        gene_info = gene_info_res.json()
+        strand = gene_info.get('strand', 1)    #extract
+
         headers = {"Content-Type": "text/plain"}
-        res = self._handle_request(f"/sequence/id/{ensembl_id}", headers)
+        res = self._handle_request(f"/sequence/id/{ensembl_id}", headers)    
         
-        if res:
-            sequence = res.text
-            return sequence[:chunk_size] if chunk_size else sequence
-        return None
+        if not res:
+            return None
+            
+        sequence = res.text
+        if chunk_size:
+            sequence = sequence[:chunk_size]
+            
+        return {
+            "sequence": sequence,    # object so we would know if we need to reverse index logic
+            "strand": strand,
+            "start": gene_info.get('start'),
+            "end": gene_info.get('end')
+        }
 
     def get_gene_info(self, ensembl_id):
         headers = {"Content-Type": "application/json"}
