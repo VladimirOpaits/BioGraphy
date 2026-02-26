@@ -1,9 +1,12 @@
 import requests
 import time
+from core.models import GeneData
+from core.utils import validate_strand
 
 class EnsemblClient:
     def __init__(self):
         self.base_url = "https://rest.ensembl.org"
+        self.mygene = MyGeneClient()
 
     def _handle_request(self, endpoint, headers):
         try:
@@ -48,6 +51,28 @@ class EnsemblClient:
         headers = {"Content-Type": "application/json"}
         res = self._handle_request(f"/lookup/id/{ensembl_id}", headers)
         return res.json() if res else None
+    
+    def get_gene_data(self, symbol: str) -> GeneData:
+        ensembl_id = self.mygene.get_ensembl_id(symbol)
+        if not ensembl_id:
+            raise ValueError(f"Could not find Ensembl ID for symbol: {symbol}")
+        
+        gene_info = self.get_gene_info(ensembl_id)
+        if not gene_info:
+            raise ValueError(f"Could not retrieve gene info for Ensembl ID: {ensembl_id}")
+        
+        sequence_data = self.get_sequence_by_id(ensembl_id)
+        if not sequence_data:
+            raise ValueError(f"Could not retrieve sequence for Ensembl ID: {ensembl_id}")
+        
+        return GeneData(
+            symbol=symbol,
+            ensembl_id=ensembl_id,
+            sequence=sequence_data['sequence'],
+            strand=sequence_data['strand'],
+            start=sequence_data['start'],
+            end=sequence_data['end']
+        )   
     
 class MyGeneClient:
     def __init__(self):

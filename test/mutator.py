@@ -1,4 +1,5 @@
 from Bio.Seq import Seq
+from core.models import MutationPair
 
 class MutationProcessor:
     def __init__(self, window_size=512):
@@ -31,14 +32,14 @@ class MutationProcessor:
         alt_list[rel_idx] = new_base
         alt_window = Seq("".join(alt_list))
         
-        return {
-            "ref": str(ref_window),
-            "alt": str(alt_window),
-            "original_base": original_base,
-            "new_base": new_base,
-            "relative_idx": rel_idx,
-            "window_range": (start, end)
-        }
+        return MutationPair(
+            ref=str(ref_window),
+            alt=str(alt_window),
+            original_base=original_base,
+            new_base=new_base,
+            relative_idx=rel_idx,
+            window_range=(start, end)
+        )
 
     def get_protein_impact(self, ref_seq, alt_seq):
         ref_prot = Seq(ref_seq).translate(stop_symbol="*", to_stop=False)

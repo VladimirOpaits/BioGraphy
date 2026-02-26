@@ -1,38 +1,60 @@
+import torch 
 import numpy as np
 from core.embedder import BioGraphyEmbedder
-from api.api_clients import MyGeneClient, EnsemblClient
-from sklearn.metrics.pairwise import cosine_similarity
+from core.models import GeneData
+from api.api_clients import EnsemblClient, MyGeneClient
+from test.mutator import MutationProcessor
 
-def run_mutation_test(name, original_seq, mutant_seq, embedder):
-    v_orig = embedder.get_vector(original_seq)
-    v_mutant = embedder.get_vector(mutant_seq)
+def run_experiment(symbol: str = "TP53"):
+    print(f"--- Starting BioGraphy Experiment: {symbol} ---")
     
-    sim = cosine_similarity(v_orig, v_mutant)[0][0]
-    dist = 1 - sim
+    # 1. Инициализация
+    client = EnsemblClient()
+    processor = MutationProcessor(window_size=512)
+    # Здесь модель начнет грузиться в память
+    embedder = BioGraphyEmbedder() 
     
-    print(f"Test: {name}")
-    print(f"  Similarity: {sim:.6f}")
-    print(f"  Distance  : {dist:.6f}")
-    print("-" * 30)
+    # 2. Получаем данные гена
+    print(f"Fetching {symbol} sequence...")
+    gene_data: GeneData = client.get_gene_data(symbol)
+    
+    # Выбираем позицию в начале первого экзона (обычно это критичное место)
+    # Для TP53 возьмем условную точку внутри кодирующей части
+    target_idx = 100 
+    original_base = gene_data.sequence[target_idx]
+    
+    # 3. Создаем два сценария
+    # Сценарий А: Тихая замена (например, на похожий нуклеотид)
+    # Сценарий Б: Радикальная замена (на что-то совсем другое)
+    bases = ['A', 'C', 'G', 'T']
+    bases.remove(original_base.upper())
+    
+    results = []
+    
+    print(f"Original base at idx {target_idx}: {original_base}")
+    print("Calculating semantic shifts...")
 
+    for alt_base in bases:
+        pair = processor.create_mutation_pair(
+            sequence=gene_data.sequence,
+            local_index=target_idx,
+            new_base=alt_base
+        )
+        
+        distance = embedder.get_mutation_distance(pair)
+        results.append((alt_base, distance))
 
-mg = MyGeneClient()
-ens = EnsemblClient()
-embedder = BioGraphyEmbedder()
+    # 4. Вывод результатов
+    print("\n--- Results (Sorted by Impact) ---")
+    # Сортируем по убыванию дистанции (самые "страшные" вверху)
+    results.sort(key=lambda x: x[1], reverse=True)
+    
+    for base, dist in results:
+        impact = "HIGH" if dist > 0.005 else "LOW" # Условный порог
+        print(f"Mutation {original_base} -> {base}: Distance = {dist:.8f} [{impact}]")
 
-gene_symbol = 'TP53'
-ensembl_id = mg.get_ensembl_id(gene_symbol)
-    
-original_dna = ens.get_sequence_by_id(ensembl_id, chunk_size=600)
-    
-print(f"\nBIOGRAPHY SENSITIVITY TEST: {gene_symbol}")
-print("="*40)
-    
-if original_dna:
-    list_dna = list(original_dna)
-    list_dna[300] = 'A' if list_dna[300] != 'A' else 'C'
-    snv_dna = "".join(list_dna)
-    run_mutation_test("Single Point Mutation", original_dna, snv_dna, embedder)
-
-    deletion_dna = original_dna[:300] + original_dna[320:]
-    run_mutation_test("20bp Deletion (Frameshift)", original_dna, deletion_dna, embedder)
+if __name__ == "__main__":
+    try:
+        run_experiment()
+    except Exception as e:
+        print(f"Error during experiment: {e}")

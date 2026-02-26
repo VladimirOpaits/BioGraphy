@@ -1,10 +1,11 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Tuple, List
-from utils import validate_nucleotide_base, validate_strand
+from .utils import validate_nucleotide_base, validate_strand
 
 class GeneData(BaseModel):
     ensembl_id: str
     symbol: str = Field(..., description="Common gene name, e.g., TP53")
+    biotype: str = Field(default="protein_coding")
     sequence: str
     strand: int
     start: int
